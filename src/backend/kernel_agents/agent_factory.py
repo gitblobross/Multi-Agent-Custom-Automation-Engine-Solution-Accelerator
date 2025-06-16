@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Type
 
 # Import the new AppConfig instance
 from app_config import config
-from azure.ai.projects.models import (ResponseFormatJsonSchema,
+from azure.ai.agents.models import (ResponseFormatJsonSchema,
                                       ResponseFormatJsonSchemaType)
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from kernel_agents.agent_base import BaseAgent

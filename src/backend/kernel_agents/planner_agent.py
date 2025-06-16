@@ -3,7 +3,7 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from azure.ai.projects.models import (ResponseFormatJsonSchema,
+from azure.ai.agents.models import (ResponseFormatJsonSchema,
                                       ResponseFormatJsonSchemaType)
 from context.cosmos_memory_kernel import CosmosMemoryContext
 from event_utils import track_event_if_configured

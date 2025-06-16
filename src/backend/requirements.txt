@@ -15,7 +15,8 @@ opentelemetry-instrumentation-openai
 opentelemetry-exporter-otlp-proto-http
 
 semantic-kernel[azure]==1.28.1
-azure-ai-projects==1.0.0b10 
+azure-ai-projects==1.0.0b10
+azure-ai-agents==1.1.0b2
 openai 
 azure-ai-inference==1.0.0b9 
 azure-search-documents 
