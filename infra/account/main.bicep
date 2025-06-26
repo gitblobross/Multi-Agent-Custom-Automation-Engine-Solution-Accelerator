@@ -4,7 +4,7 @@ metadata description = 'This module deploys a Cognitive Service.'
 @description('Required. The name of Cognitive Services account.')
 param name string
 
-param existingCognitiveServicesAccountResourceId string
+param  existingAIServiceResourceId string
 
 @description('Required. Kind of the Cognitive Services account. Use \'Get-AzCognitiveServicesAccountSku\' to determine a valid combinations of \'kind\' and \'SKU\' for your Azure region.')
 @allowed([
@@ -317,6 +317,7 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
   )
 }
 
+
 // resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
 //   name: name
 //   kind: kind
@@ -373,7 +374,7 @@ module cognitiveServiceWrapper './modules/deployAiFoundry.bicep' = {
     cMKUserAssignedIdentity: cMKUserAssignedIdentity
     location: location
     tags: tags
-    existingCognitiveServicesAccountResourceId : existingCognitiveServicesAccountResourceId
+    existingAIServiceResourceId :  existingAIServiceResourceId
     sku: sku
     allowProjectManagement: allowProjectManagement
     customSubDomainName: customSubDomainName
@@ -391,32 +392,39 @@ module cognitiveServiceWrapper './modules/deployAiFoundry.bicep' = {
   }
 }
 
-// resource CognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing =  {
-//   name: cognitiveServiceWrapper.outputs.name//cognitiveServiceWrapper.outputs.name
-//   scope: resourceGroup(cognitiveServiceWrapper.outputs.subId , cognitiveServiceWrapper.outputs.resourceGroupName)//cognitiveServiceWrapper.outputs.resourceGroupName
-// }
 
-@batchSize(1)
-resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = [
-  for (deployment, index) in (deployments ?? []): {
-    parent: resource(cognitiveServiceWrapper.outputs.resourceId, 'Microsoft.CognitiveServices/accounts@2025-04-01-preview')
-    name: deployment.?name ?? '${name}-deployments'
-    properties: {
-      model: deployment.model
-      raiPolicyName: deployment.?raiPolicyName
-      versionUpgradeOption: deployment.?versionUpgradeOption
-    }
-    sku: deployment.?sku ?? {
-      name: sku
-      capacity: sku.?capacity
-      tier: sku.?tier
-      size: sku.?size
-      family: sku.?family
-    }
-  }
-]
+var useExisting =  existingAIServiceResourceId != ''
 
-var useExisting = existingCognitiveServicesAccountResourceId != ''
+// @batchSize(1)
+// resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = [
+//   for (deployment, index) in (deployments ?? []): {
+//     parent: //resource(cognitiveServiceWrapper.outputs.resourceId, 'Microsoft.CognitiveServices/accounts@2025-04-01-preview')
+//     name: deployment.?name ?? '${name}-deployments'
+//     properties: {
+//       model: deployment.model
+//       raiPolicyName: deployment.?raiPolicyName
+//       versionUpgradeOption: deployment.?versionUpgradeOption
+//     }
+//     sku: deployment.?sku ?? {
+//       name: sku
+//       capacity: sku.?capacity
+//       tier: sku.?tier
+//       size: sku.?size
+//       family: sku.?family
+//     }
+//   }
+// ]
+
+ module gnitiveService_deployments 'modules/locaks.bicep' = {
+    scope: resourceGroup((useExisting ? split( existingAIServiceResourceId, '/')[2] : subscription().subscriptionId), (useExisting ? split( existingAIServiceResourceId, '/')[4] : resourceGroup().name ))
+    params:{
+      existingName: cognitiveServiceWrapper.outputs.name
+      name: name
+      sku: sku
+    }
+
+
+}
 
 module cognitiveService_lock 'modules/locaks.bicep' = {
   params: {
@@ -424,7 +432,7 @@ module cognitiveService_lock 'modules/locaks.bicep' = {
     lock: lock
     name: name
   }
-  scope: resourceGroup((useExisting ? split(existingCognitiveServicesAccountResourceId, '/')[1] : subscription().subscriptionId), (useExisting ? split(existingCognitiveServicesAccountResourceId, '/')[3] : resourceGroup().name ))
+  scope: resourceGroup((useExisting ? split( existingAIServiceResourceId, '/')[2] : subscription().subscriptionId), (useExisting ? split( existingAIServiceResourceId, '/')[4] : resourceGroup().name ))
 }
 
 // resource cognitiveService_lock 'Microsoft.Authorization/locks@2020-05-01' = if (!empty(lock ?? {}) && lock.?kind != 'None') {
@@ -438,34 +446,34 @@ module cognitiveService_lock 'modules/locaks.bicep' = {
   
 //   scope: tenant() //CognitiveService
 // }
-resource cognitiveService_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = [
-  for (diagnosticSetting, index) in (diagnosticSettings ?? []): {
-    name: diagnosticSetting.?name ?? '${name}-diagnosticSettings'
-    properties: {
-      storageAccountId: diagnosticSetting.?storageAccountResourceId
-      workspaceId: diagnosticSetting.?workspaceResourceId
-      eventHubAuthorizationRuleId: diagnosticSetting.?eventHubAuthorizationRuleResourceId
-      eventHubName: diagnosticSetting.?eventHubName
-      metrics: [
-        for group in (diagnosticSetting.?metricCategories ?? [{ category: 'AllMetrics' }]): {
-          category: group.category
-          enabled: group.?enabled ?? true
-          timeGrain: null
-        }
-      ]
-      logs: [
-        for group in (diagnosticSetting.?logCategoriesAndGroups ?? [{ categoryGroup: 'allLogs' }]): {
-          categoryGroup: group.?categoryGroup
-          category: group.?category
-          enabled: group.?enabled ?? true
-        }
-      ]
-      marketplacePartnerId: diagnosticSetting.?marketplacePartnerResourceId
-      logAnalyticsDestinationType: diagnosticSetting.?logAnalyticsDestinationType
-    }
-    scope: tenant()
-  }
-]
+// resource cognitiveService_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = [
+//   for (diagnosticSetting, index) in (diagnosticSettings ?? []): {
+//     name: diagnosticSetting.?name ?? '${name}-diagnosticSettings'
+//     properties: {
+//       storageAccountId: diagnosticSetting.?storageAccountResourceId
+//       workspaceId: diagnosticSetting.?workspaceResourceId
+//       eventHubAuthorizationRuleId: diagnosticSetting.?eventHubAuthorizationRuleResourceId
+//       eventHubName: diagnosticSetting.?eventHubName
+//       metrics: [
+//         for group in (diagnosticSetting.?metricCategories ?? [{ category: 'AllMetrics' }]): {
+//           category: group.category
+//           enabled: group.?enabled ?? true
+//           timeGrain: null
+//         }
+//       ]
+//       logs: [
+//         for group in (diagnosticSetting.?logCategoriesAndGroups ?? [{ categoryGroup: 'allLogs' }]): {
+//           categoryGroup: group.?categoryGroup
+//           category: group.?category
+//           enabled: group.?enabled ?? true
+//         }
+//       ]
+//       marketplacePartnerId: diagnosticSetting.?marketplacePartnerResourceId
+//       logAnalyticsDestinationType: diagnosticSetting.?logAnalyticsDestinationType
+//     }
+//     scope: 
+//   }
+// ]
 
 module cognitiveService_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.11.0' = [
   for (privateEndpoint, index) in (privateEndpoints ?? []): {
@@ -522,51 +530,64 @@ module cognitiveService_privateEndpoints 'br/public:avm/res/network/private-endp
   }
 ]
 
-resource cognitiveService_roleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+// resource cognitiveService_roleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+//   for (roleAssignment, index) in (formattedRoleAssignments ?? []): {
+//     name: roleAssignment.?name ?? guid(cognitiveServiceWrapper.outputs.resourceId, roleAssignment.principalId, roleAssignment.roleDefinitionId)
+//     properties: {
+//       roleDefinitionId: roleAssignment.roleDefinitionId
+//       principalId: roleAssignment.principalId
+//       description: roleAssignment.?description
+//       principalType: roleAssignment.?principalType
+//       condition: roleAssignment.?condition
+//       conditionVersion: !empty(roleAssignment.?condition) ? (roleAssignment.?conditionVersion ?? '2.0') : null // Must only be set if condtion is set
+//       delegatedManagedIdentityResourceId: roleAssignment.?delegatedManagedIdentityResourceId
+//     }
+//     scope: CognitiveService
+//   }
+// ]
+
+module cognitiveService_roleAssignments './modules/locaks.bicep' = [
   for (roleAssignment, index) in (formattedRoleAssignments ?? []): {
-    name: roleAssignment.?name ?? guid(cognitiveServiceWrapper.outputs.resourceId, roleAssignment.principalId, roleAssignment.roleDefinitionId)
-    properties: {
-      roleDefinitionId: roleAssignment.roleDefinitionId
-      principalId: roleAssignment.principalId
-      description: roleAssignment.?description
-      principalType: roleAssignment.?principalType
-      condition: roleAssignment.?condition
-      conditionVersion: !empty(roleAssignment.?condition) ? (roleAssignment.?conditionVersion ?? '2.0') : null // Must only be set if condtion is set
-      delegatedManagedIdentityResourceId: roleAssignment.?delegatedManagedIdentityResourceId
-    }
-    scope: CognitiveService
+   // name: roleAssignment.?name ?? guid(cognitiveServiceWrapper.outputs.resourceId, roleAssignment.principalId, roleAssignment.roleDefinitionId)
+    params: {
+    existingName: cognitiveServiceWrapper.outputs.name
+    name: name
+   }
+    scope: resourceGroup((useExisting ? split( existingAIServiceResourceId, '/')[2] : subscription().subscriptionId), (useExisting ? split( existingAIServiceResourceId, '/')[4] : resourceGroup().name ))
   }
 ]
 
-module secretsExport 'modules/keyVaultExport.bicep' = if (secretsExportConfiguration != null) {
-  name: '${uniqueString(deployment().name, location)}-secrets-kv'
-  scope: resourceGroup(
-    split(secretsExportConfiguration.?keyVaultResourceId!, '/')[2],
-    split(secretsExportConfiguration.?keyVaultResourceId!, '/')[4]
-  )
-  params: {
-    keyVaultName: last(split(secretsExportConfiguration.?keyVaultResourceId!, '/'))
-    secretsToSet: union(
-      [],
-      contains(secretsExportConfiguration!, 'accessKey1Name')
-        ? [
-            {
-              name: secretsExportConfiguration!.?accessKey1Name
-              value: cognitiveServiceWrapper.outputs.cognitiveService.listKeys().key1//cognitiveService.listKeys().key1
-            }
-          ]
-        : [],
-      contains(secretsExportConfiguration!, 'accessKey2Name')
-        ? [
-            {
-              name: secretsExportConfiguration!.?accessKey2Name
-              value: cognitiveService.listKeys().key2
-            }
-          ]
-        : []
-    )
-  }
-}
+
+
+// module secretsExport 'modules/keyVaultExport.bicep' = if (secretsExportConfiguration != null) {
+//   name: '${uniqueString(deployment().name, location)}-secrets-kv'
+//   scope: resourceGroup(
+//     split(secretsExportConfiguration.?keyVaultResourceId!, '/')[2],
+//     split(secretsExportConfiguration.?keyVaultResourceId!, '/')[4]
+//   )
+//   params: {
+//     keyVaultName: last(split(secretsExportConfiguration.?keyVaultResourceId!, '/'))
+//     secretsToSet: union(
+//       [],
+//       contains(secretsExportConfiguration!, 'accessKey1Name')
+//         ? [
+//             {
+//               name: secretsExportConfiguration!.?accessKey1Name
+//               value: cognitiveServiceWrapper.outputs.cognitiveService.listKeys().key1//cognitiveService.listKeys().key1
+//             }
+//           ]
+//         : [],
+//       contains(secretsExportConfiguration!, 'accessKey2Name')
+//         ? [
+//             {
+//               name: secretsExportConfiguration!.?accessKey2Name
+//               value: cognitiveService.listKeys().key2
+//             }
+//           ]
+//         : []
+//     )
+//   }
+// }
 
 @description('The name of the cognitive services account.')
 output name string = cognitiveServiceWrapper.outputs.name//cognitiveService.name
@@ -589,11 +610,11 @@ output systemAssignedMIPrincipalId string? = cognitiveServiceWrapper.outputs.?sy
 @description('The location the resource was deployed into.')
 output location string = cognitiveServiceWrapper.outputs.location//cognitiveService.location
 
-import { secretsOutputType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
-@description('A hashtable of references to the secrets exported to the provided Key Vault. The key of each reference is each secret\'s name.')
-output exportedSecrets secretsOutputType = (secretsExportConfiguration != null)
-  ? toObject(secretsExport.outputs.secretsSet, secret => last(split(secret.secretResourceId, '/')), secret => secret)
-  : {}
+// import { secretsOutputType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+// @description('A hashtable of references to the secrets exported to the provided Key Vault. The key of each reference is each secret\'s name.')
+// output exportedSecrets secretsOutputType = (secretsExportConfiguration != null)
+//   ? toObject(secretsExport.outputs.secretsSet, secret => last(split(secret.secretResourceId, '/')), secret => secret)
+//   : {}
 
 @description('The private endpoints of the congitive services account.')
 output privateEndpoints privateEndpointOutputType[] = [

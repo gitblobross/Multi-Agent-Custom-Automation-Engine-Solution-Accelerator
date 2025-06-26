@@ -32,7 +32,7 @@ param name string
 param kind string
 
 @description('Optional. The resource ID of an existing Cognitive Services account to reuse.')
-param existingCognitiveServicesAccountResourceId string
+param  existingAIServiceResourceId string
 
 @description('Optional. SKU of the Cognitive Services account. Use \'Get-AzCognitiveServicesAccountSku\' to determine a valid combinations of \'kind\' and \'SKU\' for your Azure region.')
 @allowed([
@@ -148,18 +148,18 @@ param tags object = {
   location: solutionLocation
 }
 
-var useExisting = !empty(existingCognitiveServicesAccountResourceId)
+var useExisting = !empty( existingAIServiceResourceId)
 
 // Extract values from existing resource ID
-var existingSubId = split(existingCognitiveServicesAccountResourceId, '/')[2]
-var existingRg = split(existingCognitiveServicesAccountResourceId, '/')[4]
-var existingName = last(split(existingCognitiveServicesAccountResourceId, '/'))
+var existingSubId = split( existingAIServiceResourceId, '/')[2]
+//var existingRg = split( existingAIServiceResourceId, '/')[4]
+var existingName = last(split( existingAIServiceResourceId, '/'))
 var properties = cMKKeyVault.cMKKey.properties
 
 // Reuse existing account
 resource existingCognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if (useExisting) {
   name: existingName
-  scope: resourceGroup(existingSubId, existingRg)
+  scope: resourceGroup((useExisting ? split( existingAIServiceResourceId, '/')[2] : subscription().subscriptionId), (useExisting ? split( existingAIServiceResourceId, '/')[4] : resourceGroup().name ))
 }
 
 resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if (!useExisting) {
@@ -211,11 +211,11 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-previ
 }
 
 var finalResourceId = useExisting
-  ? existingCognitiveServicesAccountResourceId
+  ?  existingAIServiceResourceId
   : cognitiveService.id
 
 var finalEndpoint = useExisting
-  ? reference(existingCognitiveServicesAccountResourceId, '2025-04-01-preview').properties.endpoint
+  ? reference( existingAIServiceResourceId, '2025-04-01-preview').properties.endpoint
   : cognitiveService.properties.endpoint
 
 output resourceId string = finalResourceId

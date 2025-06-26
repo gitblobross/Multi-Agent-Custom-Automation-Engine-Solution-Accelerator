@@ -742,7 +742,7 @@ module aiFoundryAiServices './account/main.bicep' = {
     name: aiFoundryAiServicesResourceName
     tags: aiFoundryAiServicesConfiguration.?tags ?? tags
     location: aiFoundryAiServicesConfiguration.?location ?? azureOpenAILocation
-    existingCognitiveServicesAccountResourceId: existingAIServiceResourceId
+    existingAIServiceResourceId: existingAIServiceResourceId
     enableTelemetry: enableTelemetry
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
     sku: aiFoundryAiServicesConfiguration.?sku ?? 'S0'
