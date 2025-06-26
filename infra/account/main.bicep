@@ -416,6 +416,17 @@ resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/depl
   }
 ]
 
+var useExisting = existingCognitiveServicesAccountResourceId != ''
+
+module cognitiveService_lock 'modules/locaks.bicep' = {
+  params: {
+    existingName: cognitiveServiceWrapper.outputs.name
+    lock: lock
+    name: name
+  }
+  scope: resourceGroup((useExisting ? split(existingCognitiveServicesAccountResourceId, '/')[1] : subscription().subscriptionId), (useExisting ? split(existingCognitiveServicesAccountResourceId, '/')[3] : resourceGroup().name ))
+}
+
 // resource cognitiveService_lock 'Microsoft.Authorization/locks@2020-05-01' = if (!empty(lock ?? {}) && lock.?kind != 'None') {
 //   name: lock.?name ?? 'lock-${name}'
 //   properties: {
