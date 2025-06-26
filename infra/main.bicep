@@ -1,6 +1,8 @@
 metadata name = 'Multi-Agent Custom Automation Engine'
 metadata description = 'This module contains the resources required to deploy the Multi-Agent Custom Automation Engine solution accelerator for both Sandbox environments and WAF aligned environments.'
 
+param existingAIServiceResourceId string = '' 
+
 @description('Optional. The prefix to add in the default names given to all deployed Azure resources.')
 @maxLength(19)
 param solutionPrefix string = 'macae${uniqueString(deployer().objectId, deployer().tenantId, subscription().subscriptionId, resourceGroup().id)}'
@@ -734,12 +736,13 @@ var aiFoundryAiServicesModelDeployment = {
   raiPolicyName: 'Microsoft.Default'
 }
 
-module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.11.0' = if (aiFoundryAIservicesEnabled) {
+module aiFoundryAiServices './account/main.bicep' = {
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
     tags: aiFoundryAiServicesConfiguration.?tags ?? tags
     location: aiFoundryAiServicesConfiguration.?location ?? azureOpenAILocation
+    existingCognitiveServicesAccountResourceId: existingAIServiceResourceId
     enableTelemetry: enableTelemetry
     diagnosticSettings: [{ workspaceResourceId: logAnalyticsWorkspaceId }]
     sku: aiFoundryAiServicesConfiguration.?sku ?? 'S0'
