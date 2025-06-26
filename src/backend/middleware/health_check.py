@@ -1,84 +1,78 @@
 import logging
+import inspect           # ← we'll use this for coroutine detection
 from typing import Awaitable, Callable, Dict
 
 from fastapi import Request
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.encoders import jsonable_encoder
+from starlette import status
+from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
-class HealthCheckResult:
-    def __init__(self, status: bool, message: str):
-        self.status = status
-        self.message = message
+class HealthCheckResult(BaseModel):
+    ok: bool = Field(..., description="True if the check passed")
+    message: str
 
 
-class HealthCheckSummary:
-    def __init__(self):
-        self.status = True
-        self.results = {}
+class HealthCheckSummary(BaseModel):
+    ok: bool = True
+    results: Dict[str, HealthCheckResult] = Field(default_factory=dict)
 
-    def Add(self, name: str, result: HealthCheckResult):
+    def add(self, name: str, result: HealthCheckResult):
         self.results[name] = result
-        self.status = self.status and result.status
+        self.ok &= result.ok
 
-    def AddDefault(self):
-        self.Add(
-            "Default",
-            HealthCheckResult(
-                True, "This is the default check, it always returns True"
-            ),
-        )
+    def add_default(self):
+        self.add("default", HealthCheckResult(ok=True, message="always true"))
 
-    def AddException(self, name: str, exception: Exception):
-        self.Add(name, HealthCheckResult(False, str(exception)))
+    def add_exception(self, name: str, exc: Exception):
+        self.add(name, HealthCheckResult(ok=False, message=str(exc)))
 
 
 class HealthCheckMiddleware(BaseHTTPMiddleware):
-    __healthz_path = "/healthz"
+    _path = "/healthz"
 
     def __init__(
         self,
         app,
-        checks: Dict[str, Callable[..., Awaitable[HealthCheckResult]]],
-        password: str = None,
+        checks: Dict[str, Callable[[], Awaitable[HealthCheckResult]]],
+        password: str | None = None,
     ):
         super().__init__(app)
         self.checks = checks
         self.password = password
 
     async def check(self) -> HealthCheckSummary:
-        results = HealthCheckSummary()
-        results.AddDefault()
+        summary = HealthCheckSummary()
+        summary.add_default()
 
-        for name, check in self.checks.items():
-            if not name or not check:
+        for name, coro in self.checks.items():
+            if not name or not coro:
                 continue
             try:
-                if not callable(check) or not hasattr(check, "__await__"):
-                    logging.error(f"Check {name} is not a coroutine function")
-                    raise ValueError(f"Check {name} is not a coroutine function")
-                results.Add(name, await check())
-            except Exception as e:
-                logging.error(f"Check {name} failed: {e}")
-                results.AddException(name, e)
-
-        return results
+                if not (callable(coro) and inspect.iscoroutinefunction(coro)):
+                    raise TypeError("check is not an async callable")
+                summary.add(name, await coro())
+            except Exception as exc:
+                logging.exception("health-check %s failed", name, exc_info=exc)
+                summary.add_exception(name, exc)
+        return summary
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path == self.__healthz_path:
-            status = await self.check()
-
-            status_code = 200 if status.status else 503
-            status_message = "OK" if status.status else "Service Unavailable"
+        if request.url.path.rstrip("/") == self._path:
+            report = await self.check()
+            code = status.HTTP_200_OK if report.ok else status.HTTP_503_SERVICE_UNAVAILABLE
+            text = "OK" if report.ok else "Service Unavailable"
 
             if (
                 self.password is not None
                 and request.query_params.get("code") == self.password
             ):
-                return JSONResponse(jsonable_encoder(status), status_code=status_code)
+                return JSONResponse(
+                    content=jsonable_encoder(report.dict()),
+                    status_code=code,
+                )
+            return PlainTextResponse(text, status_code=code)
 
-            return PlainTextResponse(status_message, status_code=status_code)
-
-        response = await call_next(request)
-        return response
+        return await call_next(request)
